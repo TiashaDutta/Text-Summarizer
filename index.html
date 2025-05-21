@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Text Summarizer</title>
+  <link rel="icon" type="image/png" href="\assets\notebook.png">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
+
+  <!-- jsPDF (for PDF download) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- pdf.js (for extracting PDF text) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #4e73df;
+      --dark-bg: #1c1e26;
+      --dark-card: #2a2c38;
+      --dark-text: #f8f9fa;
+      --light-bg: #f7f9fc;
+      --light-card: #fff;
+      --light-text: #212529;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--light-bg);
+      color: var(--light-text);
+      transition: all 0.3s ease;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    body.dark-mode {
+      background-color: var(--dark-bg);
+      color: var(--dark-text);
+    }
+
+    .navbar {
+      background-color: var(--primary);
+    }
+
+    .navbar-brand, .nav-link, .form-check-label {
+      color: white !important;
+    }
+
+    .card {
+      background-color: var(--light-card);
+      border: none;
+      border-radius: 1.5rem;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+      animation: fadeUp 0.6s ease-out;
+      transition: background-color 0.3s ease;
+    }
+
+    body.dark-mode .card {
+      background-color: var(--dark-card);
+      color: var(--dark-text);
+    }
+
+    textarea {
+      resize: none;
+      border-radius: 0.75rem;
+      transition: border-color 0.3s;
+    }
+
+    .btn-custom, .btn-clear {
+      border-radius: 0.75rem;
+      font-weight: 500;
+      transition: transform 0.2s ease, background-color 0.3s;
+    }
+
+    .btn-custom {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-custom:hover {
+      background-color: #2e59d9;
+      transform: scale(1.05);
+    }
+
+    .btn-clear {
+      background-color: #dee2e6;
+      color: #495057;
+    }
+
+    .btn-clear:hover {
+      background-color: #ced4da;
+      transform: scale(1.05);
+    }
+
+    .summary-box {
+      background-color: #f1f3f5;
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid #dee2e6;
+      animation: bounceInDown 0.6s ease-out;
+    }
+
+    body.dark-mode .summary-box {
+      background-color: #3a3b45;
+      border-color: #495057;
+    }
+
+    .action-buttons button {
+      margin: 0 5px;
+      animation: pulse 2s infinite;
+    }
+
+    .action-buttons button:hover {
+      animation: rubberBand 0.5s ease;
+    }
+
+    .word-count {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+
+    body.dark-mode .word-count {
+      color: #ced4da;
+    }
+
+    footer {
+      background-color: #e9ecef;
+      padding: 12px 0;
+      text-align: center;
+      font-size: 0.95rem;
+      color: #6c757d;
+      margin-top: auto;
+    }
+
+    body.dark-mode footer {
+      background-color: #2a2c38;
+      color: #adb5bd;
+    }
+
+    @keyframes fadeUp {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    @keyframes rubberBand {
+      0% { transform: scale3d(1, 1, 1); }
+      30% { transform: scale3d(1.25, 0.75, 1); }
+      40% { transform: scale3d(0.75, 1.25, 1); }
+      50% { transform: scale3d(1.15, 0.85, 1); }
+      65% { transform: scale3d(0.95, 1.05, 1); }
+      75% { transform: scale3d(1.05, 0.95, 1); }
+      100% { transform: scale3d(1, 1, 1); }
+    }
+
+    @keyframes bounceInDown {
+      0% { opacity: 0; transform: translateY(-50px); }
+      60% { opacity: 1; transform: translateY(20px); }
+      100% { transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container">
+      <a class="navbar-brand" href="#">📝 Text Summarizer</a>
+      <div class="form-check form-switch ms-auto">
+        <input class="form-check-input" type="checkbox" id="darkSwitch" onchange="toggleDarkMode()">
+        <label class="form-check-label" for="darkSwitch">Dark Mode</label>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container d-flex justify-content-center align-items-center py-5">
+    <div class="card p-4 w-100" style="max-width: 700px;">
+      <form method="POST" id="summarizerForm" onsubmit="return validateForm()">
+        <div class="mb-3">
+          <label for="input_text" class="form-label">Enter your text below:</label>
+          <textarea class="form-control" id="input_text" name="input_text" rows="8" required oninput="updateWordCount()" aria-describedby="textHelp" aria-live="polite"></textarea>
+          <div class="text-end word-count mt-2" id="wordCount" aria-live="polite">Words: 0</div>
+        </div>
+        <div class="mb-3">
+          <label for="fileInput" class="form-label">Upload PDF or .txt file (Max: 2MB):</label>
+          <input class="form-control" type="file" id="fileInput" accept=".txt,.pdf" onchange="handleFileUpload(event)">
+        </div>
+        <div class="d-flex justify-content-between gap-2">
+          <button type="submit" id="submitBtn" class="btn btn-custom w-100">Summarize</button>
+          <button type="button" class="btn btn-clear w-100" onclick="clearTextarea()">Clear</button>
+        </div>
+      </form>
+
+      <div class="text-center mt-4" id="loadingSpinner" style="display: none;">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2">Summarizing...</p>
+      </div>
+
+      {% if summary %}
+      <div class="mt-4">
+        <h5 class="text-muted">🔍 Summary:</h5>
+        <div class="summary-box" id="summaryText" aria-live="polite">{{ summary }}</div>
+        <div class="text-end mt-3 action-buttons">
+          <button class="btn btn-custom" onclick="downloadTxt()">Download .txt</button>
+          <button class="btn btn-custom" onclick="downloadPdf()">Download .pdf</button>
+          <button class="btn btn-custom" onclick="copyToClipboard()">Copy</button>
+        </div>
+      </div>
+      <script>
+        document.getElementById("summaryText").scrollIntoView({ behavior: "smooth" });
+      </script>
+      {% endif %}
+    </div>
+  </div>
+
+  <footer>
+    Created by Sudip Basu, Sapta Rathi Roy and Tiasha Dutta
+  </footer>
+
+  <script>
+    function clearTextarea() {
+      document.getElementById('input_text').value = '';
+      updateWordCount();
+    }
+
+    function updateWordCount() {
+      const text = document.getElementById('input_text').value.trim();
+      const words = text === '' ? 0 : text.split(/\s+/).length;
+      document.getElementById('wordCount').innerText = `Words: ${words}`;
+    }
+
+    function toggleDarkMode() {
+      const isDark = document.body.classList.toggle('dark-mode');
+      localStorage.setItem('darkMode', isDark);
+    }
+
+    function downloadTxt() {
+      const summary = document.getElementById('summaryText').innerText;
+      const blob = new Blob([summary], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'summary.txt';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadPdf() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const text = document.getElementById('summaryText').innerText;
+      const lines = doc.splitTextToSize(text, 180);
+      doc.text(lines, 10, 20);
+      doc.save("summary.pdf");
+    }
+
+    function copyToClipboard() {
+      const summary = document.getElementById('summaryText').innerText;
+      navigator.clipboard.writeText(summary).then(() => {
+        alert("Summary copied to clipboard!");
+      }).catch(() => {
+        alert("Failed to copy!");
+      });
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        alert("File too large. Max size is 2MB.");
+        event.target.value = "";
+        return;
+      }
+
+      const reader = new FileReader();
+
+      if (file.type === "text/plain") {
+        reader.onload = () => {
+          document.getElementById('input_text').value = reader.result;
+          updateWordCount();
+          alert("Text file loaded successfully.");
+        };
+        reader.readAsText(file);
+      } else if (file.type === "application/pdf") {
+        reader.onload = function () {
+          const typedArray = new Uint8Array(this.result);
+          pdfjsLib.getDocument(typedArray).promise.then(function (pdf) {
+            let textPromises = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+              textPromises.push(
+                pdf.getPage(i).then(page => page.getTextContent())
+                  .then(content => content.items.map(item => item.str).join(" "))
+              );
+            }
+            Promise.all(textPromises).then(pagesText => {
+              document.getElementById('input_text').value = pagesText.join("\n\n");
+              updateWordCount();
+              alert("PDF text loaded successfully.");
+            });
+          }).catch(err => {
+            alert("Error reading PDF: " + err.message);
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        alert("Unsupported file type. Please upload a .txt or .pdf file.");
+      }
+    }
+
+    function validateForm() {
+      const text = document.getElementById('input_text').value.trim();
+      const words = text === '' ? 0 : text.split(/\s+/).length;
+      const MAX_WORDS = 1000;
+
+      if (words > MAX_WORDS) {
+        alert(`Text is too long! Please limit to ${MAX_WORDS} words.`);
+        return false;
+      }
+
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      btn.innerText = "Processing...";
+      document.getElementById('loadingSpinner').style.display = 'block';
+
+      return true;
+    }
+
+    window.onload = () => {
+      if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('darkSwitch').checked = true;
+      }
+      updateWordCount();
+    };
+  </script>
+</body>
+</html>
